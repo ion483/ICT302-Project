@@ -1,0 +1,579 @@
+// ==========================================
+// GET HTML ELEMENTS
+// ==========================================
+
+const fileInput = document.getElementById("fileInput");
+
+const uploadBox = document.getElementById("uploadBox");
+
+const chooseFile = document.getElementById("chooseFile");
+
+const replaceFile = document.getElementById("replaceFile");
+
+const selectedFileView =
+    document.getElementById("selectedFileView");
+
+const fileName =
+    document.getElementById("fileName");
+
+const fileSize =
+    document.getElementById("fileSize");
+
+const fileStatus =
+    document.getElementById("fileStatus");
+
+const startAnalysis =
+    document.getElementById("startAnalysis");
+
+const uploadMessage =
+    document.getElementById("uploadMessage");
+
+const analysisDashboard =
+    document.getElementById("analysisDashboard");
+
+const dashboardFilename =
+    document.getElementById("dashboardFilename");
+
+const documentContent =
+    document.getElementById("documentContent");
+
+const backToUpload =
+    document.getElementById("backToUpload");
+
+const analysisTabs = document.querySelector(".analysis-tabs");
+const newAnalysisTab = document.getElementById("new-analysis-tab");
+const existingAnalysisTab = document.getElementById("existing-analysis-tab");
+const newAnalysisPanel = document.getElementById("new-analysis-panel");
+const existingAnalysisPanel = document.getElementById("existing-analysis-panel");
+const analysisHistoryElement = document.getElementById("analysisHistory");
+const timelineDialog = document.getElementById("timelineDialog");
+const historyTabs = [document.getElementById("eventsTab"), document.getElementById("sessionsTab")];
+function showHistoryTab(index) {
+    historyTabs.forEach(function (tab, position) {
+        tab.setAttribute("aria-selected", String(position === index));
+        tab.tabIndex = position === index ? 0 : -1;
+        document.getElementById(tab.getAttribute("aria-controls")).hidden = position !== index;
+    });
+}
+historyTabs.forEach(function (tab, index) {
+    tab.addEventListener("click", function () { showHistoryTab(index); });
+    tab.addEventListener("keydown", function (event) {
+        let next;
+        if (event.key === "ArrowLeft" || event.key === "ArrowRight") next = 1 - index;
+        if (event.key === "Home") next = 0;
+        if (event.key === "End") next = 1;
+        if (next !== undefined) {
+            event.preventDefault();
+            showHistoryTab(next);
+            historyTabs[next].focus();
+        }
+    });
+});
+const metadataPanel = document.getElementById("paragraphMetadata");
+const writingPanel = document.getElementById("writingStyle");
+const paragraphSelection = document.getElementById("paragraphSelection");
+const detailTabs = [document.getElementById("metadataTab"), document.getElementById("writingTab")];
+let documentReadVersion = 0;
+let currentAnalysis = null;
+
+function renderDocumentAnalysis(result) {
+    renderDocumentHistory(result);
+    const metrics = result.metrics;
+    const value = item => item == null ? "Not available" : String(item);
+    renderParagraphFacts(document.getElementById("documentSummary"), [
+        ["Created", value(result.metadata.creation_date)],
+        ["Modified", value(result.metadata.modified_date)],
+        ["Root RSID", value(result.rsid_root)],
+        ["Total words", value(metrics.total_word_count)],
+        ["Recorded revision count", value(metrics.revision_count)],
+        ["Unique paragraph RSIDs", value(metrics.unique_rsid_count)],
+        ["Words / recorded revision", value(metrics.word_to_revision_ratio)],
+        ["Paragraph RSIDs / recorded revision", value(metrics.unique_rsid_to_revision_ratio)],
+        ["Working copy integrity", result.integrity_verified ? "Verified" : "Not verified"],
+        ["Document SHA-256", value(result.sha256)],
+        ["Validation warnings", (result.warnings || []).join("; ") || "None"]
+    ]);
+    const rankings = document.getElementById("sessionRankings");
+    if (result.top_sessions.length) {
+        renderParagraphFacts(rankings, result.top_sessions.map(group => [
+            group.rsid + " (" + group.session_type + ")", group.word_count + " words"
+        ]));
+    } else rankings.textContent = "No paragraph RSIDs recorded in this document.";
+}
+
+function setHistoryMessage(message) {
+    for (const id of ["timelineEvents", "editingSessions"]) {
+        document.getElementById(id).textContent = message;
+    }
+}
+
+function appendHistoryCard(panel, title, detail) {
+    const card = document.createElement("details");
+    card.className = "history-card";
+    const summary = document.createElement("summary");
+    const label = document.createElement("strong");
+    label.textContent = title;
+    summary.append(label);
+    const text = document.createElement("p");
+    text.textContent = detail;
+    card.append(summary, text);
+    panel.append(card);
+}
+
+function renderDocumentHistory(result) {
+    const events = document.getElementById("timelineEvents");
+    const sessions = document.getElementById("editingSessions");
+    events.replaceChildren();
+    sessions.replaceChildren();
+    for (const [label, date] of [
+        ["Document created", result.metadata.creation_date],
+        ["Document last modified", result.metadata.modified_date]
+    ]) {
+        if (date) appendHistoryCard(events, label, date);
+    }
+    if (!events.childElementCount) {
+        events.textContent = "No document dates were returned by the backend.";
+    }
+    const groups = Object.entries(result.metrics.session_word_aggregates);
+    groups.sort((a, b) => b[1] - a[1]);
+    for (const [rsid, words] of groups) {
+        const groupType = result.metrics.session_types[rsid];
+        appendHistoryCard(sessions, "RSID " + rsid,
+            words + " associated words" + (groupType ? " · " + groupType : "") +
+            ". Edit timestamp unavailable.");
+    }
+    if (!groups.length) sessions.textContent = "No paragraph RSID groups were returned by the backend.";
+}
+
+function showDetailTab(index) {
+    detailTabs.forEach(function (tab, tabIndex) {
+        tab.setAttribute("aria-selected", String(tabIndex === index));
+        tab.tabIndex = tabIndex === index ? 0 : -1;
+    });
+    metadataPanel.hidden = index !== 0;
+    writingPanel.hidden = index !== 1;
+}
+
+detailTabs.forEach(function (tab, index) {
+    tab.addEventListener("click", function () { showDetailTab(index); });
+    tab.addEventListener("keydown", function (event) {
+        let next;
+        if (event.key === "ArrowRight" || event.key === "ArrowLeft") next = 1 - index;
+        if (event.key === "Home") next = 0;
+        if (event.key === "End") next = 1;
+        if (next !== undefined) {
+            event.preventDefault();
+            showDetailTab(next);
+            detailTabs[next].focus();
+        }
+    });
+});
+
+function renderParagraphFacts(panel, facts) {
+    const list = document.createElement("dl");
+    list.className = "paragraph-facts";
+    facts.forEach(function ([label, value]) {
+        const row = document.createElement("div");
+        const term = document.createElement("dt");
+        const description = document.createElement("dd");
+        term.textContent = label;
+        description.textContent = value;
+        row.append(term, description);
+        list.append(row);
+    });
+    panel.replaceChildren(list);
+}
+
+function selectParagraph(paragraph, file) {
+    documentContent.querySelectorAll(".interactive-paragraph").forEach(function (item) {
+        item.classList.toggle("is-selected", item === paragraph);
+        item.setAttribute("aria-pressed", String(item === paragraph));
+    });
+    const text = paragraph.textContent.trim();
+    const words = text.match(/\S+/g) || [];
+    const sentences = text.match(/[^.!?]+[.!?]+|[^.!?]+$/g) || [];
+    const average = words.length / Math.max(sentences.length, 1);
+    const details = currentAnalysis?.paragraphs[Number(paragraph.dataset.analysisIndex)];
+    paragraphSelection.textContent = "Paragraph " + paragraph.dataset.paragraphNumber;
+    renderParagraphFacts(metadataPanel, [
+        ["Paragraph RSID", details?.paragraph_rsidR || "Not recorded"],
+        ["Default RSID", details?.paragraph_rsidDefault || "Not recorded"],
+        ["RSID group", details?.session_type || "Unknown"],
+        ["Text run RSIDs", [...new Set((details?.runs || []).map(run => run.rsidR).filter(Boolean))].join(", ") || "Not recorded"]
+    ]);
+    renderParagraphFacts(writingPanel, [
+        ["Word count", String(details?.word_count ?? words.length)],
+        ["Sentence count (estimated)", String(sentences.length)],
+        ["Average sentence length", average.toFixed(1) + " words"],
+        ["Characters (including spaces)", String(text.length)]
+    ]);
+    const insight = document.createElement("p");
+    insight.className = "paragraph-hint";
+    insight.textContent = average > 25
+        ? "This paragraph uses long sentences on average. Consider splitting longer sentences to improve readability."
+        : "This paragraph uses " + (average > 15 ? "moderate-length" : "short") + " sentences on average.";
+    writingPanel.append(insight);
+}
+
+function enableParagraphSelection(file) {
+    const rsidColours = new Map();
+    documentContent.querySelectorAll(".rsid-run").forEach(function (run) {
+        const rsid = run.dataset.rsid.trim().toUpperCase();
+        if (!rsid) {
+            run.title = "Text RSID not recorded";
+            return;
+        }
+        if (!rsidColours.has(rsid)) {
+            // Generate additional colours instead of cycling a fixed palette.
+            const hue = (rsidColours.size * 137.508 + 30) % 360;
+            rsidColours.set(rsid, "hsl(" + hue + ", 70%, 82%)");
+        }
+        run.style.backgroundColor = rsidColours.get(rsid);
+        run.title = "Text RSID: " + rsid;
+    });
+    const paragraphs = Array.from(documentContent.querySelectorAll("p"))
+        .filter(function (paragraph) { return paragraph.textContent.trim(); });
+    paragraphs.forEach(function (paragraph, index) {
+        paragraph.classList.add("interactive-paragraph");
+        paragraph.dataset.paragraphNumber = String(index + 1);
+        paragraph.tabIndex = 0;
+        paragraph.setAttribute("role", "button");
+        paragraph.setAttribute("aria-pressed", "false");
+        paragraph.setAttribute("aria-label", "View details for paragraph " + (index + 1) + ": " + paragraph.textContent.trim());
+        paragraph.addEventListener("click", function (event) {
+            if (event.target.closest("a")) return;
+            selectParagraph(paragraph, file);
+        });
+        paragraph.addEventListener("keydown", function (event) {
+            if (event.target !== paragraph) return;
+            if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                selectParagraph(paragraph, file);
+            }
+        });
+    });
+    if (paragraphs.length) selectParagraph(paragraphs[0], file);
+    else paragraphSelection.textContent = "No text paragraphs are available in this document.";
+}
+
+document.getElementById("viewTimeline").addEventListener("click", function () {
+    showHistoryTab(0);
+    document.getElementById("timelineFilename").textContent = dashboardFilename.textContent;
+    timelineDialog.showModal();
+});
+
+document.getElementById("closeTimeline").addEventListener("click", function () {
+    timelineDialog.close();
+});
+
+timelineDialog.addEventListener("click", function (event) {
+    const bounds = timelineDialog.getBoundingClientRect();
+    if (event.target === timelineDialog &&
+        (event.clientX < bounds.left || event.clientX > bounds.right ||
+         event.clientY < bounds.top || event.clientY > bounds.bottom)) {
+        timelineDialog.close();
+    }
+});
+
+
+// Store the selected file
+let selectedFile = null;
+const analysisHistory = [];
+
+
+function renderAnalysisHistory() {
+
+    analysisHistoryElement.replaceChildren();
+
+    analysisHistory.forEach(function (file, index) {
+
+        const item = document.createElement("div");
+        item.className = "analysis-history-item";
+
+        const name = document.createElement("span");
+        name.className = "analysis-history-name";
+        name.textContent = file.name;
+
+        const openButton = document.createElement("button");
+        openButton.type = "button";
+        openButton.className = "upload-btn analysis-history-open";
+        openButton.dataset.analysisIndex = String(index);
+        openButton.textContent = "Open Analysis";
+
+        item.append(name, openButton);
+        analysisHistoryElement.append(item);
+
+    });
+
+}
+
+
+function openAnalysis(file) {
+
+    selectedFile = file;
+    dashboardFilename.textContent = file.name;
+    dashboardFilename.hidden = false;
+    document.getElementById("viewTimeline").hidden = false;
+    document.getElementById("exportFullAnalysis").hidden = false;
+    newAnalysisPanel.hidden = true;
+    existingAnalysisPanel.hidden = true;
+    analysisTabs.hidden = true;
+    analysisDashboard.hidden = false;
+    document.querySelector(".main-container").classList.add("dashboard-mode");
+    readDocument(file);
+
+}
+
+
+analysisHistoryElement.addEventListener("click", function (event) {
+
+    const button = event.target.closest("[data-analysis-index]");
+
+    if (button) {
+        openAnalysis(analysisHistory[Number(button.dataset.analysisIndex)]);
+    }
+
+});
+
+
+// ==========================================
+// ANALYSIS TABS
+// ==========================================
+
+function showTab(tab, panel) {
+
+    newAnalysisTab.classList.toggle("active", tab === newAnalysisTab);
+    existingAnalysisTab.classList.toggle("active", tab === existingAnalysisTab);
+    newAnalysisPanel.hidden = panel !== newAnalysisPanel;
+    existingAnalysisPanel.hidden = panel !== existingAnalysisPanel;
+
+}
+
+
+newAnalysisTab.addEventListener("click", function () {
+
+    showTab(newAnalysisTab, newAnalysisPanel);
+
+});
+
+
+existingAnalysisTab.addEventListener("click", function () {
+
+    showTab(existingAnalysisTab, existingAnalysisPanel);
+
+});
+
+
+// ==========================================
+// OPEN FILE SELECTOR
+// ==========================================
+
+chooseFile.addEventListener("click", function () {
+
+    fileInput.click();
+
+});
+
+
+replaceFile.addEventListener("click", function () {
+
+    fileInput.value = "";
+
+    fileInput.click();
+
+});
+
+
+// ==========================================
+// USER SELECTS FILE
+// ==========================================
+
+fileInput.addEventListener("change", function () {
+
+    const file = fileInput.files[0];
+
+    if (file) {
+
+        selectFile(file);
+
+    }
+
+});
+
+
+// ==========================================
+// SELECT FILE FUNCTION
+// ==========================================
+
+function selectFile(file) {
+
+    // File validation is performed by the backend when analysis starts.
+    selectedFile = null;
+    fileName.textContent = file.name;
+
+    if (file.size < 1024 * 1024) {
+        fileSize.textContent = (file.size / 1024).toFixed(1) + " KB";
+    } else {
+        fileSize.textContent = (file.size / (1024 * 1024)).toFixed(1) + " MB";
+    }
+
+    uploadBox.hidden = true;
+    selectedFileView.hidden = false;
+    uploadMessage.hidden = true;
+
+    selectedFile = file;
+    fileStatus.textContent = "\u2713 File selected successfully";
+    fileStatus.classList.remove("is-error");
+    startAnalysis.hidden = false;
+}
+
+// ==========================================
+// DRAG AND DROP
+// ==========================================
+
+uploadBox.addEventListener("dragover", function (event) {
+
+    event.preventDefault();
+
+    uploadBox.classList.add("is-dragging");
+
+});
+
+
+uploadBox.addEventListener("dragleave", function () {
+
+    uploadBox.classList.remove("is-dragging");
+
+});
+
+
+uploadBox.addEventListener("drop", function (event) {
+
+    event.preventDefault();
+
+    uploadBox.classList.remove("is-dragging");
+
+
+    const files = event.dataTransfer.files;
+
+
+    if (files.length !== 1) {
+
+        uploadMessage.textContent =
+            "Please choose one document at a time.";
+
+        uploadMessage.hidden = false;
+
+        return;
+
+    }
+
+
+    selectFile(files[0]);
+
+});
+
+
+// ==========================================
+// START ANALYSIS
+// ==========================================
+
+startAnalysis.addEventListener("click", function () {
+
+    if (!selectedFile) {
+
+        return;
+
+    }
+
+
+    const existingIndex = analysisHistory.findIndex(function (file) {
+        return file.name === selectedFile.name &&
+            file.size === selectedFile.size &&
+            file.lastModified === selectedFile.lastModified;
+    });
+
+    if (existingIndex === -1) {
+        analysisHistory.unshift(selectedFile);
+        renderAnalysisHistory();
+    }
+
+    openAnalysis(selectedFile);
+
+});
+
+
+// ==========================================
+// READ DOCUMENT
+// ==========================================
+
+async function readDocument(file) {
+    const readVersion = ++documentReadVersion;
+    currentAnalysis = null;
+    setHistoryMessage("Reading document analysis...");
+    document.getElementById("documentSummary").textContent = "Reading metadata...";
+    document.getElementById("sessionRankings").replaceChildren();
+    showDetailTab(0);
+    paragraphSelection.textContent = "Select a highlighted paragraph to view its details.";
+    metadataPanel.textContent = "Paragraph metadata will appear here.";
+    writingPanel.textContent = "Select a highlighted paragraph to view its writing analysis.";
+    documentContent.textContent = "Reading document...";
+    try {
+        if (!window.pywebview?.api) throw new Error("Open the desktop app with main.py to analyse documents.");
+        const encoded = await new Promise(function (resolve, reject) {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result.split(",")[1]);
+            reader.onerror = () => reject(new Error("Unable to read the selected file."));
+            reader.readAsDataURL(file);
+        });
+        if (readVersion !== documentReadVersion) return;
+        const result = await window.pywebview.api.read_docx(file.name, encoded);
+        if (readVersion !== documentReadVersion) return;
+        if (!result.success) throw new Error(result.message);
+        currentAnalysis = result;
+        renderDocumentAnalysis(result);
+        documentContent.innerHTML = result.html;
+        enableParagraphSelection(file);
+    } catch (error) {
+        if (readVersion === documentReadVersion) {
+            documentContent.textContent = error.message;
+            document.getElementById("documentSummary").textContent = "Analysis unavailable.";
+            setHistoryMessage("Analysis unavailable for this file.");
+        }
+    }
+}
+
+// ==========================================
+// BACK TO UPLOAD
+// ==========================================
+
+backToUpload.addEventListener("click", function () {
+    documentReadVersion++;
+
+    analysisDashboard.hidden = true;
+    dashboardFilename.hidden = true;
+    document.getElementById("viewTimeline").hidden = true;
+    document.getElementById("exportFullAnalysis").hidden = true;
+    document.querySelector(".main-container").classList.remove("dashboard-mode");
+
+    selectedFile = null;
+    fileInput.value = "";
+    fileName.textContent = "";
+    fileSize.textContent = "";
+    fileStatus.textContent = "\u2713 File selected successfully";
+    fileStatus.classList.remove("is-error");
+    startAnalysis.hidden = true;
+    selectedFileView.hidden = true;
+    uploadBox.hidden = false;
+    uploadMessage.hidden = true;
+
+    analysisTabs.hidden = false;
+    showTab(newAnalysisTab, newAnalysisPanel);
+
+
+    document.getElementById(
+        "new-analysis-panel"
+    ).hidden = false;
+
+});
+
