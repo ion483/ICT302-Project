@@ -46,36 +46,43 @@
             Export Full Analysis
         </button>
 
-        <div class="analysis-tabs">
+    </div>
+
+    <aside class="sidebar" aria-label="Main navigation">
+        <nav class="analysis-tabs" aria-label="Analysis views">
 
             <button
                 type="button"
                 class="analysis-tab active"
-                id="new-analysis-tab">
+                id="new-analysis-tab"
+                aria-label="Home"
+                title="Home">
 
-                Upload New File
+                <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="m3 10 9-7 9 7"></path>
+                    <path d="M5 9v12h5v-7h4v7h5V9"></path>
+                </svg>
 
-            </button>
-
-            <button
-                type="button"
-                class="analysis-tab"
-                id="existing-analysis-tab">
-
-                Existing Analysis
+                <span class="sidebar-label" aria-hidden="true">Home</span>
 
             </button>
 
             <button
                 type="button"
                 class="analysis-tab"
-                id="temp-workspace-tab">
-                Run History
+                id="temp-workspace-tab"
+                aria-label="Run History"
+                title="Run History">
+                <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M3 11a9 9 0 1 1 2.6 7.4"></path>
+                    <path d="M3 4v7h7"></path>
+                    <path d="M12 7v5l3 2"></path>
+                </svg>
+                <span class="sidebar-label" aria-hidden="true">Run History</span>
             </button>
 
-        </div>
-
-    </div>
+        </nav>
+    </aside>
 
 
     <!-- ========================= -->
@@ -90,6 +97,8 @@
         <!-- ========================= -->
 
         <section id="new-analysis-panel">
+
+            <h2 class="saved-analysis-title">Upload New File</h2>
 
             <div class="upload-card">
 
@@ -212,6 +221,8 @@
         <!-- ANALYSIS VIEW -->
         <!-- ========================= -->
 
+        <div class="upload-divider" aria-hidden="true">or</div>
+
         <section
             id="analysisDashboard"
             class="analysis-dashboard"
@@ -292,14 +303,11 @@
 
         <section
             id="existing-analysis-panel"
-            class="tab-panel"
-            hidden>
+            class="tab-panel">
+
+            <h2 class="saved-analysis-title">Open Existing Analysis</h2>
 
             <div class="upload-card">
-
-                <p class="subtitle">
-                    Saved analyses are stored locally and can be reopened after restarting the app.
-                </p>
 
                 <div id="analysisHistory" class="analysis-history" aria-live="polite"></div>
                 <p id="analysisHistoryStatus" class="upload-message" role="status" hidden></p>

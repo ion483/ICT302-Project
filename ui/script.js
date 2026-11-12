@@ -41,8 +41,22 @@ const backToUpload =
     document.getElementById("backToUpload");
 
 const analysisTabs = document.querySelector(".analysis-tabs");
+const sidebarHighlight = document.createElement("span");
+sidebarHighlight.className = "sidebar-highlight";
+sidebarHighlight.setAttribute("aria-hidden", "true");
+analysisTabs.prepend(sidebarHighlight);
+function updateSidebarHighlight() {
+    const activeTab = analysisTabs.querySelector(".analysis-tab.active");
+    if (!activeTab) return;
+    sidebarHighlight.style.transform = "translateY(" + activeTab.offsetTop + "px)";
+    sidebarHighlight.style.height = activeTab.offsetHeight + "px";
+}
+requestAnimationFrame(updateSidebarHighlight);
+new ResizeObserver(updateSidebarHighlight).observe(analysisTabs);
+new MutationObserver(updateSidebarHighlight).observe(analysisTabs, {
+    subtree: true, attributes: true, attributeFilter: ["class"]
+});
 const newAnalysisTab = document.getElementById("new-analysis-tab");
-const existingAnalysisTab = document.getElementById("existing-analysis-tab");
 const newAnalysisPanel = document.getElementById("new-analysis-panel");
 const existingAnalysisPanel = document.getElementById("existing-analysis-panel");
 const analysisHistoryElement = document.getElementById("analysisHistory");
@@ -110,6 +124,17 @@ const STATISTIC_HELP = {
     "Attributed words": "Words assigned to usable RSIDs using a deterministic approximation for split words. Unlabelled text is excluded.",
 };
 function displayValue(item) { return item == null ? "Not available" : String(item); }
+function formatDocumentDate(value) {
+    if (!value) return "Not available";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return String(value);
+    return date.toLocaleString("en-US", {
+        timeZone: "Asia/Singapore",
+        month: "long", day: "numeric", year: "numeric",
+        hour: "numeric", minute: "2-digit", hour12: true,
+        timeZoneName: "shortOffset"
+    });
+}
 function displayRsid(item) {
     if (!item) return "Not recorded";
     if (String(item).toUpperCase() === "00000000") return "Unavailable (00000000 placeholder)";
@@ -130,8 +155,8 @@ function renderDocumentAnalysis(result) {
     renderParagraphFacts(document.getElementById("documentSummary"), [
         ["Creator", displayValue(properties.creator)],
         ["Last modified by", displayValue(properties.last_modified_by)],
-        ["Created", displayValue(properties.creation_date)],
-        ["Last modified", displayValue(properties.modified_date)],
+        ["Created", formatDocumentDate(properties.creation_date)],
+        ["Last modified", formatDocumentDate(properties.modified_date)],
         ["Application", displayValue(properties.application)],
         ["Application version", displayValue(properties.app_version)],
         ["Recorded editing time", properties.editing_time_minutes == null ? "Not available" : properties.editing_time_minutes + " min"],
@@ -211,14 +236,7 @@ function renderDocumentHistory(result) {
         const item = document.createElement("li");
         const timestamp = document.createElement("time");
         timestamp.dateTime = date;
-        try {
-            const dt = new Date(date);
-            timestamp.textContent = isNaN(dt) ? date : dt.toLocaleString("en-US", {
-                month: "long", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit", timeZoneName: "short"
-            });
-        } catch (e) {
-            timestamp.textContent = date;
-        }
+        timestamp.textContent = formatDocumentDate(date);
         const description = document.createElement("p");
         description.textContent = label;
         const attribution = document.createElement("p");
@@ -519,7 +537,7 @@ function openAnalysis(file) {
     document.getElementById("exportFullAnalysis").hidden = false;
     newAnalysisPanel.hidden = true;
     existingAnalysisPanel.hidden = true;
-    analysisTabs.hidden = true;
+    analysisTabs.hidden = false;
     analysisDashboard.hidden = false;
     document.querySelector(".main-container").classList.add("dashboard-mode");
     readDocument(file, file.id);
@@ -542,15 +560,6 @@ analysisHistoryElement.addEventListener("click", function (event) {
 // ANALYSIS TABS
 // ==========================================
 
-function showTab(tab, panel) {
-
-    newAnalysisTab.classList.toggle("active", tab === newAnalysisTab);
-    existingAnalysisTab.classList.toggle("active", tab === existingAnalysisTab);
-    newAnalysisPanel.hidden = panel !== newAnalysisPanel;
-    existingAnalysisPanel.hidden = panel !== existingAnalysisPanel;
-
-}
-
 
 newAnalysisTab.addEventListener("click", function () {
 
@@ -558,13 +567,6 @@ newAnalysisTab.addEventListener("click", function () {
 
 });
 
-
-existingAnalysisTab.addEventListener("click", function () {
-
-    showTab(existingAnalysisTab, existingAnalysisPanel);
-    refreshSavedAnalyses();
-
-});
 
 
 // ==========================================
@@ -812,11 +814,17 @@ const tempWorkspaceListElement = document.getElementById("tempWorkspaceList");
 
 function showTab(tab, panel) {
     newAnalysisTab.classList.toggle("active", tab === newAnalysisTab);
-    existingAnalysisTab.classList.toggle("active", tab === existingAnalysisTab);
     if (tempWorkspaceTab) tempWorkspaceTab.classList.toggle("active", tab === tempWorkspaceTab);
+    if (!analysisDashboard.hidden) documentReadVersion++;
+    analysisDashboard.hidden = true;
+    dashboardFilename.hidden = true;
+    document.getElementById("viewTimeline").hidden = true;
+    document.getElementById("exportFullAnalysis").hidden = true;
+    document.querySelector(".main-container").classList.remove("dashboard-mode");
     
     newAnalysisPanel.hidden = panel !== newAnalysisPanel;
-    existingAnalysisPanel.hidden = panel !== existingAnalysisPanel;
+    existingAnalysisPanel.hidden = panel !== newAnalysisPanel;
+    if (panel === newAnalysisPanel) refreshSavedAnalyses();
     if (tempWorkspacePanel) tempWorkspacePanel.hidden = panel !== tempWorkspacePanel;
 }
 
