@@ -1,11 +1,15 @@
 """Connect desktop analysis results to local sessions and PDF reports."""
+import shutil
 from pathlib import Path
 from uuid import UUID, uuid4
 
+from core.integrity import sha256_file
 from core.report_generator import generate_pdf_report
 from core.session_manager import (
     SessionError, create_session, default_session_directory, load_session, save_session,
 )
+
+from core.paths import storage_root
 
 
 class AnalysisStore:
@@ -75,9 +79,39 @@ class AnalysisStore:
         }, destination)
 
     def delete(self, session_id):
-            """Delete a saved session JSON file from disk by its session ID."""
+            """Delete a saved session JSON file from disk by its session ID and clean up matching temp runs."""
             path = self._path(session_id)
+            target_hash = None
+
+            # 1. Retrieve the file's SHA-256 hash before removing the JSON session
+            if path.is_file():
+                try:
+                    _, result = self.open(session_id)
+                    target_hash = result.get('sha256')
+                except Exception:
+                    pass
+
+            deleted = False
             if path.is_file():
                 path.unlink()
-                return True
-            return False
+                deleted = True
+
+            # 2. Automatically remove associated runs in temp_workspace by hashing files directly
+            temp_dir = storage_root() / "temp_workspace"
+            if temp_dir.exists() and target_hash:
+                from core.integrity import sha256_file
+                for item in temp_dir.iterdir():
+                    if item.is_dir():
+                        matched = False
+                        for file_path in item.glob('**/*'):
+                            if file_path.is_file():
+                                try:
+                                    if sha256_file(file_path) == target_hash:
+                                        matched = True
+                                        break
+                                except Exception:
+                                    pass
+                        if matched:
+                            shutil.rmtree(item, ignore_errors=True)
+
+            return deleted
