@@ -30,25 +30,16 @@
             hidden>
         </span>
 
-        <button
-            type="button"
-            class="timeline-button header-timeline-button"
-            id="viewTimeline"
-            hidden>
-            View Summary
-        </button>
-
-        <button
-            type="button"
-            class="timeline-button"
-            id="exportFullAnalysis"
-            hidden>
-            Export Full Analysis
-        </button>
-
     </div>
 
     <aside class="sidebar" aria-label="Main navigation">
+        <div class="sidebar-brand">
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                <circle cx="12" cy="12" r="9"></circle>
+                <path d="m10 8 6 4-6 4z"></path>
+            </svg>
+            <span>CopyQ</span>
+        </div>
         <nav class="analysis-tabs" aria-label="Analysis views">
 
             <button
@@ -67,20 +58,23 @@
 
             </button>
 
-            <button
-                type="button"
-                class="analysis-tab"
-                id="temp-workspace-tab"
-                aria-label="Run History"
-                title="Run History">
-                <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <path d="M3 11a9 9 0 1 1 2.6 7.4"></path>
-                    <path d="M3 4v7h7"></path>
-                    <path d="M12 7v5l3 2"></path>
-                </svg>
-                <span class="sidebar-label" aria-hidden="true">Run History</span>
-            </button>
+            <div class="home-subtabs" aria-label="Home sections">
+                <button type="button" class="home-subtab" data-home-section="new-analysis-panel">
+                    Upload New File
+                </button>
+                <button type="button" class="home-subtab" data-home-section="existing-analysis-panel">
+                    Continue Analysis
+                </button>
+            </div>
 
+            <button type="button" class="analysis-tab" id="current-analysis-tab"
+                aria-label="Analysis" title="Analysis" hidden>
+                <svg class="sidebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <path d="M14 2v6h6M8 16v2M12 12v6M16 14v4"></path>
+                </svg>
+                <span class="sidebar-label" aria-hidden="true">Analysis</span>
+            </button>
         </nav>
     </aside>
 
@@ -229,15 +223,24 @@
             hidden>
 
 
+            <div class="dashboard-toolbar">
             <button
                 type="button"
                 class="dashboard-back"
                 id="backToUpload">
 
-                ← Back to upload
+                ← Back to home
 
             </button>
-
+                <div class="dashboard-toolbar-actions">
+                    <button type="button" class="timeline-button" id="viewTimeline" hidden>
+                        View Summary
+                    </button>
+                    <button type="button" class="timeline-button" id="exportFullAnalysis" hidden>
+                        Export Full Analysis
+                    </button>
+                </div>
+            </div>
 
             <p id="analysisActionStatus" role="status" aria-live="polite"></p>
 
@@ -305,7 +308,7 @@
             id="existing-analysis-panel"
             class="tab-panel">
 
-            <h2 class="saved-analysis-title">Open Existing Analysis</h2>
+            <h2 class="saved-analysis-title">Continue Analysis</h2>
 
             <div class="upload-card">
 
