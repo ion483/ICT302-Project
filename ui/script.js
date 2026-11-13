@@ -57,6 +57,10 @@ new MutationObserver(updateSidebarHighlight).observe(analysisTabs, {
     subtree: true, attributes: true, attributeFilter: ["class"]
 });
 const newAnalysisTab = document.getElementById("new-analysis-tab");
+const currentAnalysisTab = document.getElementById("current-analysis-tab");
+currentAnalysisTab.addEventListener("click", function () {
+    if (!analysisDashboard.hidden) updateSidebarHighlight();
+});
 const newAnalysisPanel = document.getElementById("new-analysis-panel");
 const existingAnalysisPanel = document.getElementById("existing-analysis-panel");
 const analysisHistoryElement = document.getElementById("analysisHistory");
@@ -462,7 +466,12 @@ async function refreshSavedAnalyses() {
         if (!response.success) throw new Error(response.message);
         analysisHistory = response.sessions;
         renderAnalysisHistory();
-        if (!analysisHistory.length) analysisHistoryElement.textContent = "No saved analyses yet.";
+        if (!analysisHistory.length) {
+            const message = document.createElement("div");
+            message.className = "upload-subtext analysis-history-empty";
+            message.textContent = "No saved analyses yet.";
+            analysisHistoryElement.append(message);
+        }
     } catch (error) {
         analysisHistoryElement.textContent = error.message;
     }
@@ -539,6 +548,11 @@ function openAnalysis(file) {
     existingAnalysisPanel.hidden = true;
     analysisTabs.hidden = false;
     analysisDashboard.hidden = false;
+    currentAnalysisTab.hidden = false;
+    analysisTabs.querySelectorAll(".analysis-tab").forEach(function (tab) {
+        tab.classList.toggle("active", tab === currentAnalysisTab);
+    });
+    if (tempWorkspacePanel) tempWorkspacePanel.hidden = true;
     document.querySelector(".main-container").classList.add("dashboard-mode");
     readDocument(file, file.id);
 
@@ -563,7 +577,7 @@ analysisHistoryElement.addEventListener("click", function (event) {
 
 newAnalysisTab.addEventListener("click", function () {
 
-    showTab(newAnalysisTab, newAnalysisPanel);
+    returnToUpload();
 
 });
 
@@ -773,7 +787,7 @@ document.getElementById("exportFullAnalysis").addEventListener("click", async fu
 // BACK TO UPLOAD
 // ==========================================
 
-backToUpload.addEventListener("click", function () {
+function returnToUpload() {
     documentReadVersion++;
 
     analysisDashboard.hidden = true;
@@ -801,7 +815,96 @@ backToUpload.addEventListener("click", function () {
         "new-analysis-panel"
     ).hidden = false;
 
+}
+
+backToUpload.addEventListener("click", returnToUpload);
+
+let homeNavigationFrame = 0;
+let homeNavigationActive = false;
+document.querySelectorAll("[data-home-section]").forEach(function (button) {
+    button.addEventListener("click", function () {
+        if (newAnalysisPanel.hidden) returnToUpload();
+        const section = document.getElementById(button.dataset.homeSection);
+        cancelAnimationFrame(homeNavigationFrame);
+        const scroller = document.querySelector(".main-container");
+        const inset = parseFloat(getComputedStyle(scroller).scrollPaddingTop) || 0;
+        const start = scroller.scrollTop;
+        const destination = section.getBoundingClientRect().top
+            - scroller.getBoundingClientRect().top + start - inset;
+        const duration = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 500;
+        const started = performance.now();
+        homeNavigationActive = true;
+        scroller.style.scrollSnapType = "none";
+        function animate(now) {
+            if (newAnalysisPanel.hidden) {
+                homeNavigationActive = false;
+                scroller.style.removeProperty("scroll-snap-type");
+                return;
+            }
+            const progress = duration ? Math.min(1, (now - started) / duration) : 1;
+            const eased = progress < 0.5 ? 4 * progress ** 3 : 1 - (-2 * progress + 2) ** 3 / 2;
+            scroller.scrollTop = start + (destination - start) * eased;
+            if (progress < 1) homeNavigationFrame = requestAnimationFrame(animate);
+            else {
+                homeNavigationActive = false;
+                scroller.style.removeProperty("scroll-snap-type");
+            }
+        }
+        homeNavigationFrame = requestAnimationFrame(animate);
+    });
 });
+
+// Start section navigation on wheel input instead of waiting for native snapping.
+const homeScrollContainer = document.querySelector(".main-container");
+const homeSectionButtons = Array.from(document.querySelectorAll("[data-home-section]"));
+function updateHomeSectionHighlight() {
+    const containerTop = homeScrollContainer.getBoundingClientRect().top;
+    const inset = parseFloat(getComputedStyle(homeScrollContainer).scrollPaddingTop) || 0;
+    const sections = [newAnalysisPanel, existingAnalysisPanel];
+    const distances = sections.map(section => Math.abs(section.getBoundingClientRect().top - containerTop - inset));
+    const activeSection = distances[1] < distances[0] ? existingAnalysisPanel : newAnalysisPanel;
+    homeSectionButtons.forEach(function (button) {
+        const active = !newAnalysisPanel.hidden && button.dataset.homeSection === activeSection.id;
+        button.classList.toggle("is-current", active);
+        if (active) button.setAttribute("aria-current", "location");
+        else button.removeAttribute("aria-current");
+    });
+}
+homeScrollContainer.addEventListener("scroll", updateHomeSectionHighlight, { passive: true });
+new ResizeObserver(updateHomeSectionHighlight).observe(homeScrollContainer);
+new MutationObserver(updateHomeSectionHighlight).observe(newAnalysisPanel, {
+    attributes: true, attributeFilter: ["hidden"]
+});
+updateHomeSectionHighlight();
+homeScrollContainer.addEventListener("wheel", function (event) {
+    if (newAnalysisPanel.hidden || event.ctrlKey || event.shiftKey || !event.deltaY
+            || Math.abs(event.deltaX) > Math.abs(event.deltaY) || !event.cancelable) return;
+    // Keep scrolling inside nested controls independent of section navigation.
+    let target = event.target instanceof Element ? event.target : null;
+    while (target && target !== homeScrollContainer) {
+        if (/(auto|scroll)/.test(getComputedStyle(target).overflowY)
+                && target.scrollHeight > target.clientHeight) return;
+        target = target.parentElement;
+    }
+    const sections = [newAnalysisPanel, existingAnalysisPanel];
+    const inset = parseFloat(getComputedStyle(homeScrollContainer).scrollPaddingTop) || 0;
+    const containerTop = homeScrollContainer.getBoundingClientRect().top;
+    const positions = sections.map(section => section.getBoundingClientRect().top
+        - containerTop + homeScrollContainer.scrollTop - inset);
+    if (homeNavigationActive) {
+        event.preventDefault();
+        return;
+    }
+    const position = homeScrollContainer.scrollTop;
+    // Let users read a section taller than the viewport before moving onward.
+    const historyBottom = existingAnalysisPanel.getBoundingClientRect().bottom;
+    if (position >= positions[1] - 2 && event.deltaY > 0
+            && historyBottom > homeScrollContainer.getBoundingClientRect().bottom + 2) return;
+    if (position > positions[1] + 2 && event.deltaY < 0) return;
+    event.preventDefault();
+    if (Math.abs(homeScrollContainer.scrollTop - positions[event.deltaY > 0 ? 1 : 0]) < 2) return;
+    homeSectionButtons[event.deltaY > 0 ? 1 : 0].click();
+}, { passive: false });
 
 
 // ==========================================
@@ -813,6 +916,8 @@ const tempWorkspacePanel = document.getElementById("temp-workspace-panel");
 const tempWorkspaceListElement = document.getElementById("tempWorkspaceList");
 
 function showTab(tab, panel) {
+    currentAnalysisTab.hidden = true;
+    currentAnalysisTab.classList.remove("active");
     newAnalysisTab.classList.toggle("active", tab === newAnalysisTab);
     if (tempWorkspaceTab) tempWorkspaceTab.classList.toggle("active", tab === tempWorkspaceTab);
     if (!analysisDashboard.hidden) documentReadVersion++;

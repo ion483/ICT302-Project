@@ -5,6 +5,8 @@ from uuid import UUID, uuid4
 
 from core.integrity import sha256_file
 from core.report_generator import generate_pdf_report
+from core.integrity import sha256_file
+from core.paths import storage_root
 from core.session_manager import (
     SessionError, create_session, default_session_directory, load_session, save_session,
 )
