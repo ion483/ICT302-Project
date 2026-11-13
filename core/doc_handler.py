@@ -52,6 +52,10 @@ def handle_upload(source_path: str | Path, workspace_dir: str | Path = "storage/
         orig_hash = integrity_result["original_hash"]
         copy_hash = integrity_result["copy_hash_initial"]
 
+        # --- TEMPORARY TEST OVERRIDE ---
+        #copy_hash = "f" * 64  # Force a mismatch with a fake SHA-256 hash
+        # -------------------------------
+
         if log is not None:
             log.write(Event.ORIGINAL_HASHED, file_name=src.name, sha256=orig_hash)
             log.write(Event.WORKING_COPY_CREATED, file_name=dest.name, sha256=copy_hash, details={"destination": str(dest)})
@@ -63,6 +67,13 @@ def handle_upload(source_path: str | Path, workspace_dir: str | Path = "storage/
         else:
             if log is not None:
                 log.write(Event.HASH_MISMATCH, file_name=dest.name, sha256=copy_hash, details={"error": "Hash mismatch between original and working copy."})
+
+            # Clean up the entire run workspace folder (parent of 'working')
+            run_folder = workspace.parent
+            if run_folder.exists() and run_folder != Path("storage/temp_workspace"):
+                import shutil
+                shutil.rmtree(run_folder, ignore_errors=True)
+
             return False, "Cryptographic integrity violation: Working copy hash does not match original file.", check
 
     except Exception as e:

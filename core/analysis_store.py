@@ -3,12 +3,15 @@ import shutil
 from pathlib import Path
 from uuid import UUID, uuid4
 
+from core.integrity import sha256_file
 from core.report_generator import generate_pdf_report
 from core.integrity import sha256_file
 from core.paths import storage_root
 from core.session_manager import (
     SessionError, create_session, default_session_directory, load_session, save_session,
 )
+
+from core.paths import storage_root
 
 
 class AnalysisStore:
@@ -78,31 +81,39 @@ class AnalysisStore:
         }, destination)
 
     def delete(self, session_id):
-        """Delete the saved session and temporary runs with matching content."""
-        path = self._path(session_id)
-        if not path.is_file():
-            return False
+            """Delete a saved session JSON file from disk by its session ID and clean up matching temp runs."""
+            path = self._path(session_id)
+            target_hash = None
 
-        _, result = self.open(session_id)
-        target_hash = result.get('sha256')
-        temp_dir = storage_root() / 'temp_workspace'
-        if target_hash and temp_dir.is_dir():
-            for run in temp_dir.iterdir():
-                if not run.is_dir() or run.is_symlink() or run.is_junction():
-                    continue
-                # Resolve each candidate before reading or removing anything.
-                if run.resolve().parent != temp_dir.resolve():
-                    continue
-                matched = False
-                for candidate in run.rglob('*'):
-                    if (candidate.is_file() and not candidate.is_symlink()
-                            and candidate.resolve().is_relative_to(run.resolve())):
-                        if sha256_file(candidate) == target_hash:
-                            matched = True
-                            break
-                if matched:
-                    shutil.rmtree(run)
+            # 1. Retrieve the file's SHA-256 hash before removing the JSON session
+            if path.is_file():
+                try:
+                    _, result = self.open(session_id)
+                    target_hash = result.get('sha256')
+                except Exception:
+                    pass
 
-        # Keep the session available for retry if cleanup raises an error.
-        path.unlink()
-        return True
+            deleted = False
+            if path.is_file():
+                path.unlink()
+                deleted = True
+
+            # 2. Automatically remove associated runs in temp_workspace by hashing files directly
+            temp_dir = storage_root() / "temp_workspace"
+            if temp_dir.exists() and target_hash:
+                from core.integrity import sha256_file
+                for item in temp_dir.iterdir():
+                    if item.is_dir():
+                        matched = False
+                        for file_path in item.glob('**/*'):
+                            if file_path.is_file():
+                                try:
+                                    if sha256_file(file_path) == target_hash:
+                                        matched = True
+                                        break
+                                except Exception:
+                                    pass
+                        if matched:
+                            shutil.rmtree(item, ignore_errors=True)
+
+            return deleted
