@@ -356,7 +356,7 @@
         </div>
 
         <div class="timeline-modal-body">
-            <p class="timeline-description" id="timelineDescription">Available document dates and RSID-associated text groups. Paragraph playback follows document order, not the actual writing chronology. RSIDs do not prove authorship or misconduct.</p>
+            <p class="timeline-description" id="timelineDescription">The timeline below shows only the document’s recorded creation and last-modified dates, if available. These properties can be missing or changed by editing software and do not reconstruct a full editing history.</p>
 
             <section aria-labelledby="documentSummaryTitle">
                 <h2 id="documentSummaryTitle">Document summary</h2>
@@ -373,15 +373,9 @@
                 <div class="timeline-section-heading">
                     <h3 id="documentTimelineTitle">Document Timeline</h3>
                 </div>
-                <div class="paragraph-tabs timeline-view-tabs" role="tablist" aria-label="Document history view">
-                    <button type="button" id="eventsTab" role="tab" aria-selected="true" aria-controls="timelineEvents">Recorded dates</button>
-                    <button type="button" id="sessionsTab" role="tab" aria-selected="false" aria-controls="editingSessions" tabindex="-1">RSID / player</button>
-                </div>
-                <div id="timelineEvents" role="tabpanel" aria-labelledby="eventsTab" tabindex="0">
+                <p class="paragraph-hint">Recorded file properties only; these timestamps are not a step-by-step writing history.</p>
+                <div id="timelineEvents" aria-live="polite">
                     <p class="paragraph-hint">Analyse a document to view available dates.</p>
-                </div>
-                <div id="editingSessions" role="tabpanel" aria-labelledby="sessionsTab" tabindex="0" hidden>
-                    <p class="paragraph-hint">Analyse a document to view available RSID groups.</p>
                 </div>
             </section>
 

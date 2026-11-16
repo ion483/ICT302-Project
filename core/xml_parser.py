@@ -158,24 +158,3 @@ class XMLParser:
                     value = value.lower() in ('true', '1')
                 metadata[key] = value
         return metadata
-
-    def generate_timeline_player_sequence(self, parsed_paragraphs: list[dict]) -> list[dict]:
-        """RSID groups in order of FIRST APPEARANCE IN DOCUMENT, not time.
-
-        Neither the order of settings.xml's rsid table nor the hex identifier
-        provides a trustworthy editing chronology. Only meaningful IDs enter.
-        """
-        grouped = {}
-        root = self.extract_rsid_root()
-        for paragraph in parsed_paragraphs:
-            for run in paragraph.get('runs', []):
-                rsid = usable_rsid(run.get('rsidR'))
-                if not rsid:
-                    continue
-                if rsid not in grouped:
-                    grouped[rsid] = {'rsid': rsid, 'total_word_count': 0,
-                                     'combined_text': '',
-                                     'session_type': self._session_type(rsid, root)}
-                grouped[rsid]['total_word_count'] += run.get('word_count', 0)
-                grouped[rsid]['combined_text'] += run.get('text', '')
-        return list(grouped.values())

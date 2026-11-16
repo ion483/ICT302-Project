@@ -76,7 +76,6 @@ class AnalysisStore:
                           'working_copy_verified': result['integrity_verified']},
             'top_sessions': result['top_sessions'],
             'paragraphs': result.get('paragraphs', []),
-            'session_sequence': result.get('session_sequence', []),
             'analysis_notices': result.get('analysis_notices', []),
         }, destination)
 

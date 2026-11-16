@@ -798,10 +798,7 @@ body:has(#existing-analysis-panel:not([hidden])) {
     color: #21384e;
 }
 
-.player-controls button {
-    color: #21384e;
-}
-
+/* Secondary numeric markers for distinct RSIDs in the document preview. */
 .document-content .rsid-run[data-rsid-number]::before {
     content: attr(data-rsid-number);
     display: inline-block;
@@ -1121,20 +1118,6 @@ body:has(.main-container.dashboard-mode) > .header {
 .revision-subheading { margin: 24px 0 0; font-size: 15px; font-weight: 600; }
 .timeline-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 28px 0 18px; }
 .timeline-section-heading h3 { margin: 0; font-size: 19px; font-weight: 600; }
-.timeline-view-tabs { background: transparent; padding: 0; gap: 8px; }
-.timeline-view-tabs button { border-radius: 980px; }
-.timeline-view-tabs button[aria-selected="true"] { background: var(--content-background); color: #21384e; box-shadow: none; }
-.history-card { margin-bottom: 10px; border: 1px solid #d5e4f2; border-radius: 12px; }
-.history-card[open] { border-color: #abc8e3; }
-.history-card summary { display: flex; align-items: flex-start; gap: 14px; padding: 20px 18px; cursor: pointer; list-style: none; }
-.history-card summary::-webkit-details-marker { display: none; }
-.history-card summary::after { content: ""; width: 7px; height: 7px; margin: 5px 2px 0 auto; border-right: 1.5px solid #586f85; border-bottom: 1.5px solid #586f85; transform: rotate(45deg); flex-shrink: 0; }
-.history-card[open] summary::after { transform: rotate(225deg); margin-top: 9px; }
-.history-card summary:focus-visible { outline: 2px solid #c2ddf6; outline-offset: 2px; border-radius: 12px; }
-.history-icon { width: 16px; flex-shrink: 0; color: #586f85; }
-.history-card strong { display: block; font-size: 16px; font-weight: 600; }
-.history-card time, .history-timestamp { display: block; margin-top: 9px; font-size: 14px; color: #586f85; }
-.history-card > p { margin: 0 18px 0 48px; padding: 18px 0; border-top: 1px solid #ededf0; font-size: 14px; line-height: 1.6; }
 .revision-legend {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1161,14 +1144,6 @@ body:has(.main-container.dashboard-mode) > .header {
 /* Compact, always-visible explanations for nontechnical investigators. */
 .fact-explanation { font-size: 12px; font-weight: 400; color: #586f85; line-height: 1.55; margin: 6px 0 0; }
 .analysis-observation { padding: 10px 12px; border-left: 3px solid #a3a3ad; border-radius: 5px; background: #edf5fc; font-size: 13px; line-height: 1.55; }
-.document-order-player { padding: 14px 18px; border: 1px solid #d5e4f2; border-radius: 12px; margin-bottom: 16px; }
-.document-order-player h4 { font-size: 16px; margin: 0; }
-.document-order-player .paragraph-hint { margin: 8px 0; }
-.player-counter { font-size: 13px; color: #586f85; margin: 12px 0 4px; }
-.player-excerpt { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 180px; overflow-y: auto; line-height: 1.6; padding: 10px; border-radius: 8px; background: #edf5fc; }
-.player-controls { display: flex; gap: 10px; justify-content: flex-end; }
-.player-controls button { padding: 8px 16px; border: 1px solid #d1d1d6; border-radius: 8px; background: #ffffff; cursor: pointer; }
-.player-controls button:disabled { opacity: .4; cursor: default; }
 
 /* Left navigation stays available across upload, history and analysis views. */
 .sidebar {
