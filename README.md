@@ -13,7 +13,7 @@ py -3.12 -m pip install -r requirements.txt
 py -3.12 main.py
 ```
 
-4. Select one **`.docx`**. Analysis starts automatically. Use the summary for metadata, observations, recorded dates, and the **document-order** paragraph player. Select a paragraph to see RSID details or **Text Statistics**.
+4. Select one **`.docx`**. Analysis starts automatically. Use the summary for metadata, observations, and the **recorded creation/last-modified dates**. Select a paragraph to see RSID details or **Text Statistics**.
 5. Select **Export Full Analysis** to choose a PDF destination.
 
 To run automated tests (install `pytest` separately if needed):
@@ -31,7 +31,7 @@ All data is handled locally. Do **not** commit actual student documents, analysi
 - The **Root** group matches `w:rsidRoot`. **Other** identifies another usable RSID. Neither identifies an author.
 - `00000000`, absent, and malformed RSIDs are treated as **unavailable**. Missing revision counts are not silently replaced with 1.
 - When a word spans multiple XML runs, CopyQ counts it **once** and attributes it to the run containing the most characters (ties to the first). This is a stated approximation.
-- The player steps through **current document order**, not established editing chronology. The recorded-date view shows document-property dates only when present.
+- The **Document Timeline** shows recorded creation and last-modified dates only when present; it is not a reconstruction of intermediate editing sessions. The paragraph/RSID player has been removed by team scope decision.
 - The review indicator for a large RSID-associated group uses a *non-validated descriptive* threshold (60% of words, documents of at least 100 words). It does **not** prove a paste event.
 
 ## Notes for the developer / demonstrator
@@ -44,3 +44,7 @@ All data is handled locally. Do **not** commit actual student documents, analysi
 - Do not use Google Docs exports as the only demonstration files: some contain all-zero RSIDs and no core document properties. Use a real Word-created `.docx` with meaningful RSIDs to show grouping; use Google Docs export to demonstrate the unavailable-data fallback.
 
 See `IMPLEMENTATION_NOTES.md` for FR cross-check and known limitations.
+
+## Scope update — 14 November 2026
+
+The team removed the document-order paragraph player and RSID/playback tab. The existing created/modified dates display remains. No chronological edit reconstruction is claimed. See `IMPLEMENTATION_NOTES.md` and update the R&A change log; the original FR-7 should not be marked as fully fulfilled without a formally revised scope.

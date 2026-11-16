@@ -159,7 +159,14 @@ def generate_pdf_report(analysis_result: dict[str, Any], destination: str | Path
     if paragraphs:
         story.append(Paragraph('Current document text — paragraph-level visual overview', styles['CopyQSection']))
         story.append(Paragraph('Paragraphs are shown in current document order, with a pale background indicating their RSID grouping when one is available. Groups are not verified edit times.', styles['CopyQBody']))
-        sequence = analysis_result.get('session_sequence') or []
+        # Colour text by first appearance of each usable RSID in current
+        # document content. This is a presentation palette, not playback order.
+        sequence = list(dict.fromkeys(
+            run['rsidR'].upper()
+            for paragraph in paragraphs
+            for run in paragraph.get('runs', [])
+            if run.get('rsidR')
+        ))
         colour_by_rsid = {rsid.upper(): _rsid_colour(index) for index, rsid in enumerate(sequence)}
         # Render all paragraphs, not just a silent top-N subset. Paragraphs can
         # naturally flow across PDF pages if they are long.

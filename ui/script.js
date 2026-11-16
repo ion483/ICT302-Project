@@ -65,28 +65,6 @@ const newAnalysisPanel = document.getElementById("new-analysis-panel");
 const existingAnalysisPanel = document.getElementById("existing-analysis-panel");
 const analysisHistoryElement = document.getElementById("analysisHistory");
 const timelineDialog = document.getElementById("timelineDialog");
-const historyTabs = [document.getElementById("eventsTab"), document.getElementById("sessionsTab")];
-function showHistoryTab(index) {
-    historyTabs.forEach(function (tab, position) {
-        tab.setAttribute("aria-selected", String(position === index));
-        tab.tabIndex = position === index ? 0 : -1;
-        document.getElementById(tab.getAttribute("aria-controls")).hidden = position !== index;
-    });
-}
-historyTabs.forEach(function (tab, index) {
-    tab.addEventListener("click", function () { showHistoryTab(index); });
-    tab.addEventListener("keydown", function (event) {
-        let next;
-        if (event.key === "ArrowLeft" || event.key === "ArrowRight") next = 1 - index;
-        if (event.key === "Home") next = 0;
-        if (event.key === "End") next = 1;
-        if (next !== undefined) {
-            event.preventDefault();
-            showHistoryTab(next);
-            historyTabs[next].focus();
-        }
-    });
-});
 const metadataPanel = document.getElementById("paragraphMetadata");
 const writingPanel = document.getElementById("writingStyle");
 const paragraphSelection = document.getElementById("paragraphSelection");
@@ -159,8 +137,7 @@ function renderDocumentAnalysis(result) {
     renderParagraphFacts(document.getElementById("documentSummary"), [
         ["Creator", displayValue(properties.creator)],
         ["Last modified by", displayValue(properties.last_modified_by)],
-        ["Created", formatDocumentDate(properties.creation_date)],
-        ["Last modified", formatDocumentDate(properties.modified_date)],
+        // Creation and modification timestamps are shown in Document Timeline below.
         ["Application", displayValue(properties.application)],
         ["Application version", displayValue(properties.app_version)],
         ["Recorded editing time", properties.editing_time_minutes == null ? "Not available" : properties.editing_time_minutes + " min"],
@@ -206,29 +183,12 @@ function renderDocumentAnalysis(result) {
 }
 
 function setHistoryMessage(message) {
-    for (const id of ["timelineEvents", "editingSessions"]) {
-        document.getElementById(id).textContent = message;
-    }
-}
-
-function appendHistoryCard(panel, title, detail) {
-    const card = document.createElement("details");
-    card.className = "history-card";
-    const summary = document.createElement("summary");
-    const label = document.createElement("strong");
-    label.textContent = title;
-    summary.append(label);
-    const text = document.createElement("p");
-    text.textContent = detail;
-    card.append(summary, text);
-    panel.append(card);
+    document.getElementById("timelineEvents").textContent = message;
 }
 
 function renderDocumentHistory(result) {
     const events = document.getElementById("timelineEvents");
-    const sessions = document.getElementById("editingSessions");
     events.replaceChildren();
-    sessions.replaceChildren();
     const timeline = document.createElement("ol");
     timeline.className = "document-timeline";
     // Backend metadata fields: creator and last_modified_by (DOCX core properties).
@@ -253,62 +213,9 @@ function renderDocumentHistory(result) {
     if (timeline.childElementCount) {
         events.append(timeline);
     } else {
-        events.textContent = "No document dates were returned by the backend.";
+        events.textContent = "Creation and modification dates are not available in this document. This does not affect other analysis features.";
     }
-    const steps = (result.paragraphs || []).filter(p => p.text && p.text.trim());
-    if (steps.length) {
-        const player = document.createElement("section");
-        player.className = "document-order-player";
-        const heading = document.createElement("h4");
-        heading.textContent = "Document-order paragraph player";
-        const caution = document.createElement("p");
-        caution.className = "paragraph-hint";
-        caution.textContent = "Steps follow paragraph positions in the current document, NOT the chronological order of writing.";
-        const counter = document.createElement("p");
-        counter.className = "player-counter";
-        const preview = document.createElement("p");
-        preview.className = "player-excerpt";
-        const prev = document.createElement("button");
-        prev.type = "button"; prev.textContent = "Previous";
-        const next = document.createElement("button");
-        next.type = "button"; next.textContent = "Next";
-        const controls = document.createElement("div");
-        controls.className = "player-controls";
-        controls.append(prev, next);
-        let step = 0;
-        function showStep() {
-            const current = steps[step];
-            counter.textContent = "Paragraph " + (step + 1) + " / " + steps.length +
-                " · " + current.word_count + " words · " + (current.session_type || "Unavailable") + " RSID";
-            preview.textContent = current.text;
-            prev.disabled = step === 0;
-            next.disabled = step === steps.length - 1;
-        }
-        prev.addEventListener("click", () => { if (step > 0) { step--; showStep(); } });
-        next.addEventListener("click", () => { if (step < steps.length - 1) { step++; showStep(); } });
-        player.append(heading, caution, counter, preview, controls);
-        sessions.append(player);
-        showStep();
-    }
-    const groups = Object.entries(result.metrics.session_word_aggregates || {});
-    const sequenceOrder = new Map(
-        (result.session_sequence || []).map((rsid, index) => [rsid.toUpperCase(), index])
-    );
-    groups.sort((a, b) => {
-        const aOrder = sequenceOrder.get(a[0].toUpperCase());
-        const bOrder = sequenceOrder.get(b[0].toUpperCase());
-        if (aOrder === undefined && bOrder === undefined) return 0;
-        if (aOrder === undefined) return 1;
-        if (bOrder === undefined) return -1;
-        return aOrder - bOrder;
-    });
-    for (const [rsid, words] of groups) {
-        const groupType = result.metrics.session_types[rsid];
-        appendHistoryCard(sessions, "RSID " + rsid,
-            words + " associated words" + (groupType ? " · " + groupType : "") +
-            ". First appearance in document order only; editing timestamp unavailable.");
-    }
-    if (!groups.length) sessions.textContent = "No usable RSIDs were found. A document-order RSID view is unavailable.";
+
 }
 
 function showDetailTab(index) {
@@ -436,7 +343,6 @@ function enableParagraphSelection() {
 }
 
 document.getElementById("viewTimeline").addEventListener("click", function () {
-    showHistoryTab(0);
     document.getElementById("timelineFilename").textContent = dashboardFilename.textContent;
     timelineDialog.showModal();
 });

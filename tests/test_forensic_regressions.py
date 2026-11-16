@@ -49,7 +49,6 @@ class ForensicParserTests(unittest.TestCase):
         para = parser.parse_document_structure()[0]
         self.assertEqual(para['session_type'], 'Unavailable')
         self.assertIsNone(para['runs'][0]['rsidR'])
-        self.assertEqual(parser.generate_timeline_player_sequence([para]), [])
         metrics = MetricsCalculator([para], {'revision_count': None}).compute_macro_metrics()
         self.assertEqual(metrics['unique_rsid_count'], 0)
         self.assertEqual(metrics['session_word_aggregates'], {})
@@ -68,13 +67,27 @@ class ForensicParserTests(unittest.TestCase):
         self.assertEqual(para['text'], 'First\tsecond')
         self.assertEqual(para['word_count'], 2)
 
-    def test_document_order_not_settings_order(self):
-        doc = xml_doc('<w:p w:rsidRDefault="AAAA0001"><w:r><w:t>A</w:t></w:r></w:p>'
-                      '<w:p w:rsidRDefault="BBBB0002"><w:r><w:t>B</w:t></w:r></w:p>')
-        settings = xml_settings(values='<w:rsid w:val="BBBB0002"/><w:rsid w:val="AAAA0001"/>')
-        parser = XMLParser({'document_xml': doc, 'settings_xml': settings})
-        self.assertEqual([x['rsid'] for x in parser.generate_timeline_player_sequence(parser.parse_document_structure())],
-                         ['AAAA0001', 'BBBB0002'])
+    def test_recorded_dates_extracted_without_edit_player(self):
+        core_xml = ET.fromstring('''<cp:coreProperties
+            xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties"
+            xmlns:dcterms="http://purl.org/dc/terms/">
+            <dcterms:created>2026-11-01T10:00:00Z</dcterms:created>
+            <dcterms:modified>2026-11-12T19:30:00Z</dcterms:modified>
+        </cp:coreProperties>''')
+        result = analyze_buffers({'document_xml': xml_doc('<w:p/>'), 'core_xml': core_xml})
+        self.assertEqual(result['metadata']['creation_date'], '2026-11-01T10:00:00Z')
+        self.assertEqual(result['metadata']['modified_date'], '2026-11-12T19:30:00Z')
+        self.assertNotIn('session_sequence', result)
+
+    def test_no_player_or_rsid_timeline_remains_in_frontend(self):
+        source = Path(__file__).resolve().parents[1]
+        html = (source / 'ui' / 'index.html').read_text(encoding='utf-8')
+        js = (source / 'ui' / 'script.js').read_text(encoding='utf-8')
+        self.assertIn('id="timelineEvents"', html)
+        self.assertIn('Document Created', js)
+        self.assertIn('Document Modified', js)
+        for removed in ('editingSessions', 'sessionsTab', 'document-order-player', 'player-controls'):
+            self.assertNotIn(removed, html + js)
 
     def test_extended_metadata_and_absence_are_distinct(self):
         parser = XMLParser({})
@@ -99,7 +112,7 @@ class ForensicParserTests(unittest.TestCase):
         doc = xml_doc('<w:p w:rsidR="00000000"><w:r><w:t>Test</w:t></w:r></w:p>')
         result = analyze_buffers({'document_xml': doc})
         self.assertTrue(result['success'])
-        self.assertEqual(result['session_sequence'], [])
+        self.assertNotIn('session_sequence', result)
         self.assertTrue(any('unavailable' in note.lower() for note in result['analysis_notices']))
 
 

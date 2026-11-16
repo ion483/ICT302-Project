@@ -112,7 +112,6 @@ def analyze_buffers(buffers):
     paragraphs = parser.parse_document_structure()
     metadata = parser.extract_core_metadata()
     calculator = MetricsCalculator(paragraphs, metadata)
-    timeline_sessions = parser.generate_timeline_player_sequence(paragraphs)
     # Match XMLParser.parse_document_structure's traversal exactly, including
     # empty paragraphs and paragraphs inside tables. Do not depend on helper
     # methods outside the supplied parser's public interface. Deleted content
@@ -136,5 +135,4 @@ def analyze_buffers(buffers):
         'metrics': metrics,
         'analysis_notices': notices,
         'top_sessions': calculator.generate_top_n_rankings(),
-        'session_sequence': [session['rsid'] for session in timeline_sessions],
     }
