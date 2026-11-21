@@ -5,6 +5,7 @@ from uuid import UUID, uuid4
 
 from core.integrity import sha256_file
 from core.report_generator import generate_pdf_report
+from core.rsid_palette import build_rsid_palette
 from core.integrity import sha256_file
 from core.paths import storage_root
 from core.session_manager import (
@@ -44,6 +45,7 @@ class AnalysisStore:
         result = analysis.get('result')
         if session['analysis_status'] != 'complete' or not isinstance(result, dict) or not result.get('success'):
             raise ValueError('This session does not contain a completed document analysis.')
+        result['rsid_palette'] = build_rsid_palette(result.get('paragraphs', []))
         return analysis['filename'], result
 
     def list(self):

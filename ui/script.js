@@ -67,8 +67,9 @@ const analysisHistoryElement = document.getElementById("analysisHistory");
 const timelineDialog = document.getElementById("timelineDialog");
 const metadataPanel = document.getElementById("paragraphMetadata");
 const writingPanel = document.getElementById("writingStyle");
+const associationsPanel = document.getElementById("paragraphAssociations");
 const paragraphSelection = document.getElementById("paragraphSelection");
-const detailTabs = [document.getElementById("metadataTab"), document.getElementById("writingTab")];
+const detailTabs = [document.getElementById("metadataTab"), document.getElementById("writingTab"), document.getElementById("associationsTab")];
 let documentReadVersion = 0;
 let currentAnalysis = null;
 
@@ -219,21 +220,24 @@ function renderDocumentHistory(result) {
 }
 
 function showDetailTab(index) {
+    detailTabs[0].parentElement.style.setProperty("--active-detail-tab", index);
     detailTabs.forEach(function (tab, tabIndex) {
         tab.setAttribute("aria-selected", String(tabIndex === index));
         tab.tabIndex = tabIndex === index ? 0 : -1;
     });
     metadataPanel.hidden = index !== 0;
     writingPanel.hidden = index !== 1;
+    associationsPanel.hidden = index !== 2;
 }
 
 detailTabs.forEach(function (tab, index) {
     tab.addEventListener("click", function () { showDetailTab(index); });
     tab.addEventListener("keydown", function (event) {
         let next;
-        if (event.key === "ArrowRight" || event.key === "ArrowLeft") next = 1 - index;
+        if (event.key === "ArrowRight") next = (index + 1) % detailTabs.length;
+        if (event.key === "ArrowLeft") next = (index + detailTabs.length - 1) % detailTabs.length;
         if (event.key === "Home") next = 0;
-        if (event.key === "End") next = 1;
+        if (event.key === "End") next = detailTabs.length - 1;
         if (next !== undefined) {
             event.preventDefault();
             showDetailTab(next);
@@ -267,7 +271,62 @@ function renderParagraphFacts(panel, facts) {
     panel.replaceChildren(list);
 }
 
-function selectParagraph(paragraph) {
+function paragraphRsids(paragraph) {
+    return [...new Set([paragraph.dataset.rsid,
+        ...Array.from(paragraph.querySelectorAll(".rsid-run"), run => run.dataset.rsid)]
+        .map(value => (value || "").trim().toUpperCase())
+        .filter(value => /^[0-9A-F]{8}$/.test(value) && value !== "00000000"))];
+}
+
+function renderAssociations(paragraph, selectedRsid) {
+    associationsPanel.replaceChildren();
+    const rsids = paragraphRsids(paragraph);
+    if (!rsids.length) {
+        const empty = document.createElement("p");
+        empty.className = "paragraph-hint";
+        empty.textContent = "No usable RSID is recorded for this paragraph.";
+        associationsPanel.append(empty);
+        return;
+    }
+    const label = document.createElement("label");
+    label.htmlFor = "associationRsid";
+    label.textContent = "RSID";
+    const select = document.createElement("select");
+    select.id = "associationRsid";
+    rsids.forEach(rsid => {
+        const option = document.createElement("option");
+        option.value = rsid;
+        option.textContent = rsid;
+        select.append(option);
+    });
+    if (rsids.includes(selectedRsid)) select.value = selectedRsid;
+    const list = document.createElement("ol");
+    list.className = "association-paragraphs";
+    function updateMatches() {
+        const matches = Array.from(documentContent.querySelectorAll(".interactive-paragraph"))
+            .filter(item => paragraphRsids(item).includes(select.value));
+        list.replaceChildren();
+        matches.forEach(item => {
+            const entry = document.createElement("li");
+            const heading = document.createElement("button");
+            heading.type = "button";
+            heading.textContent = "Paragraph " + item.dataset.paragraphNumber;
+            if (item === paragraph) heading.setAttribute("aria-current", "true");
+            heading.addEventListener("click", function () {
+                selectParagraph(item, select.value);
+                item.focus({ preventScroll: true });
+                item.scrollIntoView({ behavior: "smooth", block: "center" });
+            });
+            entry.append(heading);
+            list.append(entry);
+        });
+    }
+    select.addEventListener("change", updateMatches);
+    associationsPanel.append(label, select, list);
+    updateMatches();
+}
+
+function selectParagraph(paragraph, selectedRsid) {
     documentContent.querySelectorAll(".interactive-paragraph").forEach(function (item) {
         item.classList.toggle("is-selected", item === paragraph);
         item.setAttribute("aria-pressed", String(item === paragraph));
@@ -294,10 +353,11 @@ function selectParagraph(paragraph) {
     insight.className = "paragraph-hint";
     insight.textContent = "These are descriptive text measurements. They do not establish authorship, editing history or misconduct.";
     writingPanel.append(insight);
+    renderAssociations(paragraph, selectedRsid);
 }
 
 function enableParagraphSelection() {
-    const rsidColours = new Map();
+    const rsidColours = new Map(Object.entries(currentAnalysis?.rsid_palette || {}));
     documentContent.querySelectorAll(".rsid-run").forEach(function (run) {
         const rsid = run.dataset.rsid.trim().toUpperCase();
         if (!/^[0-9A-F]{8}$/.test(rsid) || rsid === "00000000") {
@@ -328,7 +388,7 @@ function enableParagraphSelection() {
         paragraph.setAttribute("aria-label", "View details for paragraph " + (index + 1) + ": " + paragraph.textContent.trim());
         paragraph.addEventListener("click", function (event) {
             if (event.target.closest("a")) return;
-            selectParagraph(paragraph);
+            selectParagraph(paragraph, event.target.closest(".rsid-run")?.dataset.rsid?.trim().toUpperCase());
         });
         paragraph.addEventListener("keydown", function (event) {
             if (event.target !== paragraph) return;
@@ -339,7 +399,10 @@ function enableParagraphSelection() {
         });
     });
     if (paragraphs.length) selectParagraph(paragraphs[0]);
-    else paragraphSelection.textContent = "No text paragraphs are available in this document.";
+    else {
+        paragraphSelection.textContent = "No text paragraphs are available in this document.";
+        associationsPanel.replaceChildren();
+    }
 }
 
 document.getElementById("viewTimeline").addEventListener("click", function () {
@@ -637,6 +700,7 @@ async function readDocument(file, sessionId) {
     paragraphSelection.textContent = "Select a highlighted paragraph to view its details.";
     metadataPanel.textContent = "Paragraph metadata will appear here.";
     writingPanel.textContent = "Select a highlighted paragraph to view text statistics.";
+    associationsPanel.textContent = "Select a paragraph to view its RSID associations.";
     documentContent.textContent = "Reading document...";
     try {
         if (!window.pywebview?.api) throw new Error("Open the desktop app with main.py to analyse documents.");

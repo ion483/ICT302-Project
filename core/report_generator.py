@@ -3,19 +3,90 @@
 Uses ReportLab to avoid relying on a browser, network, or HTML-to-PDF engine.
 All indicators are descriptive and must not be treated as a misconduct verdict.
 """
-import colorsys
+import re
 from datetime import datetime
 from html import escape
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import Any
+from core.rsid_palette import build_rsid_palette
 
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import mm
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
+from reportlab.pdfbase.pdfmetrics import stringWidth
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Table, TableStyle, HRFlowable, Flowable
+
+
+class _ColourRow(Flowable):
+    """One splittable-by-row line of the text-free RSID map."""
+
+    def __init__(self, segments):
+        super().__init__()
+        self.segments = segments
+        self.width = sum(width for width, _, _ in segments)
+        self.height = 12
+
+    def draw(self):
+        offset = 0
+        badges = []
+        for width, colour, number in self.segments:
+            self.canv.setFillColor(colour)
+            self.canv.rect(offset, 2, width, 10, stroke=0, fill=1)
+            if number is not None:
+                label = str(number)
+                size = 6
+                badge_width = stringWidth(label, 'Helvetica-Bold', size) + size
+                # Narrow blocks retain their width; their readable badge sits left.
+                badge_x = offset if width >= badge_width else offset - badge_width
+                badges.append((badge_x, badge_width, label))
+            offset += width
+        # Draw labels last so later colour blocks cannot cover them.
+        for badge_x, badge_width, label in badges:
+            self.canv.setFillColor(colors.white)
+            self.canv.roundRect(badge_x, 3.6, badge_width, 8.4, 1.2, stroke=0, fill=1)
+            self.canv.setFillColor(colors.HexColor('#21384e'))
+            self.canv.setFont('Helvetica-Bold', 6)
+            self.canv.drawString(badge_x + 3, 5.4, label)
+
+
+def _colour_map_rows(paragraphs, width):
+    """Pack text widths continuously, without preserving paragraph/line breaks."""
+    palette = build_rsid_palette(paragraphs)
+    segments = []
+    used = 0
+    for paragraph in paragraphs:
+        runs = paragraph.get('runs') or [{'text': paragraph.get('text', '')}]
+        for run in runs:
+            rsid = (run.get('rsidR') or '').strip().upper()
+            if re.fullmatch(r'[0-9A-F]{8}', rsid) and rsid != '00000000':
+                indicator = palette.get(rsid)
+                if indicator is None:
+                    continue
+                colour = colors.HexColor(indicator['colour'])
+                number = indicator['number']
+            else:
+                colour = colors.HexColor('#e5e7eb')
+                number = None
+            for character in run.get('text', ''):
+                if character in '\r\n':
+                    continue
+                remaining = stringWidth(' ' if character.isspace() else character, 'Helvetica', 8.6)
+                while remaining > 0:
+                    amount = min(remaining, width - used)
+                    if segments and segments[-1][1:] == (colour, number):
+                        segments[-1] = (segments[-1][0] + amount, colour, number)
+                    else:
+                        segments.append((amount, colour, number))
+                    used += amount
+                    remaining -= amount
+                    if used >= width - 1e-8:
+                        yield _ColourRow(segments)
+                        segments, used = [], 0
+    if segments:
+        yield _ColourRow(segments)
 
 
 def _display(value: Any) -> str:
@@ -34,12 +105,6 @@ def _format_timestamp(value: Any) -> str:
         return parsed.strftime('%Y-%m-%d %H:%M:%S %z').strip()
     except ValueError:
         return value
-
-
-def _rsid_colour(index: int):
-    hue = ((index * 137.508 + 30) % 360) / 360
-    r, g, b = colorsys.hls_to_rgb(hue, .82, .70)
-    return colors.Color(r, g, b)
 
 
 def _safe_text(text) -> str:
@@ -74,6 +139,7 @@ def generate_pdf_report(analysis_result: dict[str, Any], destination: str | Path
 
     story = [Paragraph('CopyQ — Forensic Document Analysis', styles['CopyQTitle'])]
     story.append(Paragraph('Local, descriptive evidence summary. This document does not determine authorship, pasting, or academic misconduct.', styles['CopyQBody']))
+    report_date = datetime.now().astimezone().strftime('%Y-%m-%d %H:%M:%S %z')
     story.append(HRFlowable(width='100%', thickness=1, color=colors.HexColor('#999999')))
     story.append(Paragraph('Document metadata and integrity', styles['CopyQSection']))
 
@@ -157,47 +223,21 @@ def generate_pdf_report(analysis_result: dict[str, Any], destination: str | Path
         story.append(Paragraph('No usable RSID groups available.', styles['CopyQBody']))
 
     if paragraphs:
-        story.append(Paragraph('Current document text — paragraph-level visual overview', styles['CopyQSection']))
-        story.append(Paragraph('Paragraphs are shown in current document order, with a pale background indicating their RSID grouping when one is available. Groups are not verified edit times.', styles['CopyQBody']))
-        # Colour text by first appearance of each usable RSID in current
-        # document content. This is a presentation palette, not playback order.
-        sequence = list(dict.fromkeys(
-            run['rsidR'].upper()
-            for paragraph in paragraphs
-            for run in paragraph.get('runs', [])
-            if run.get('rsidR')
-        ))
-        colour_by_rsid = {rsid.upper(): _rsid_colour(index) for index, rsid in enumerate(sequence)}
-        # Render all paragraphs, not just a silent top-N subset. Paragraphs can
-        # naturally flow across PDF pages if they are long.
-        for i, paragraph in enumerate(paragraphs, 1):
-            content = paragraph.get('text') or ''
-            if not content.strip():
-                continue
-            present = [r.get('rsidR') for r in paragraph.get('runs', []) if r.get('rsidR')]
-            rsid = present[0].upper() if present else None
-            info = f'Paragraph {i} · {paragraph.get("word_count", 0)} words · RSID {rsid or "Unavailable"}'
-            story.append(Paragraph(_safe_text(info), styles['CopyQSmall']))
-            para_style = ParagraphStyle('P_' + str(i), parent=styles['CopyQText'],
-                                        backColor=colors.HexColor('#f8f8f8'), borderPadding=6)
-            coloured_runs = []
-            for run in paragraph.get('runs', []):
-                raw = run.get('text', '')
-                if not raw:
-                    continue
-                colour = colour_by_rsid.get((run.get('rsidR') or '').upper())
-                if colour:
-                    hex_colour = '#' + colour.hexval()[-6:]
-                    coloured_runs.append('<font backColor="' + hex_colour + '">' + _safe_text(raw) + '</font>')
-                else:
-                    coloured_runs.append(_safe_text(raw))
-            story.append(Paragraph(''.join(coloured_runs) if coloured_runs else _safe_text(content), para_style))
-            story.append(Spacer(1, 3 * mm))
+        story.append(Paragraph('RSID colour overview', styles['CopyQSection']))
+        story.append(Paragraph('Colours follow current document order, without text or paragraph breaks. Grey indicates an unavailable RSID. Groups are not verified edit times.', styles['CopyQBody']))
+        # Match the usable frame width, including ReportLab's default frame padding.
+        map_width = A4[0] - 34 * mm - 12
+        story.extend(_colour_map_rows(paragraphs, map_width))
 
     def footer(canvas, doc):
+        canvas.saveState()
         canvas.setFont('Helvetica', 8)
         canvas.setFillColor(colors.HexColor('#666666'))
+        if doc.page == 1:
+            canvas.drawRightString(A4[0] - 17 * mm, A4[1] - 10 * mm,
+                                   'Report date: ' + report_date)
         canvas.drawRightString(A4[0] - 16 * mm, 12 * mm, f'CopyQ · Page {doc.page}')
+        canvas.restoreState()
 
     with NamedTemporaryFile(mode='wb', suffix='.pdf', dir=output.parent, delete=False) as file:
         temp = Path(file.name)
