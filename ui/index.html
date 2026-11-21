@@ -276,18 +276,24 @@
                     <!-- ========================= -->
 
                     <section
-                        class="dashboard-pane">
+                        class="dashboard-pane paragraph-detail-pane">
 
                         <div class="paragraph-tabs" role="tablist" aria-label="Paragraph details">
                             <button type="button" id="metadataTab" role="tab" aria-selected="true" aria-controls="paragraphMetadata">Metadata</button>
                             <button type="button" id="writingTab" role="tab" aria-selected="false" aria-controls="writingStyle" tabindex="-1">Text Statistics</button>
+                            <button type="button" id="associationsTab" role="tab" aria-selected="false" aria-controls="paragraphAssociations" tabindex="-1">Associations</button>
                         </div>
+                        <div class="paragraph-detail-scroll">
                         <p class="paragraph-selection" id="paragraphSelection" aria-live="polite">Select a highlighted paragraph to view its details.</p>
                         <div id="paragraphMetadata" role="tabpanel" aria-labelledby="metadataTab" tabindex="0">
                             <p class="paragraph-hint">Paragraph metadata will appear here.</p>
                         </div>
                         <div id="writingStyle" class="analysis-result" role="tabpanel" aria-labelledby="writingTab" tabindex="0" hidden>
                             Select a highlighted paragraph to view its text statistics.
+                        </div>
+                        <div id="paragraphAssociations" role="tabpanel" aria-labelledby="associationsTab" tabindex="0" hidden>
+                            <p class="paragraph-hint">Select a paragraph to view its RSID associations.</p>
+                        </div>
                         </div>
 
                     </section>

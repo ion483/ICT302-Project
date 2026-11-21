@@ -18,6 +18,7 @@ from core.metrics_calculator import MetricsCalculator
 from core.doc_handler import handle_upload, verify_working_copy
 from core.verification_log import Event, VerificationLog, LogIntegrityError
 from core.paths import storage_root
+from core.rsid_palette import build_rsid_palette
 
 W = '{http://schemas.openxmlformats.org/wordprocessingml/2006/main}'
 
@@ -130,6 +131,7 @@ def analyze_buffers(buffers):
         'success': True,
         'html': render(buffers['document_xml'], indices),
         'paragraphs': paragraphs,
+        'rsid_palette': build_rsid_palette(paragraphs),
         'metadata': metadata,
         'rsid_root': parser.extract_rsid_root(),
         'metrics': metrics,
